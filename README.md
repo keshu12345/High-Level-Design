@@ -276,5 +276,93 @@ Storing grid in MYSQL super easy
  # Uber System Design
 
  * How do we store quad tree??
- * How  to  design for Uber
+ * How to Quad Tree design for Uber
  * There is 100 millions places do we require single machine or multiple machine to store
+
+ 100 millions places stroed exactly once
+
+ How many many nodes there is in this tree
+
+```
+ leaf node =100 millions
+ parent of leaf node =100 millions/4
+ parent of parent node=100 millions/16
+ 1 millions=10^6
+
+10^8+10^8/4+10^8/16+10^8/64.............infinity
+r=1/4
+
+total nodes=10^8*(1/1-r)=10^8*(1/1-1/4)=10^8*4/3
+totals nodes=10^8*(3/4)
+```
+
+![Alt text](image-14.png)
+![Alt text](image-15.png)
+
+Totals nodes=6.5 millions
+* In the worst case ,all places in the 4th level
+* Some level shorter and some level larger
+* we store co-ordinate or placeId something and meta data is stored into seperately in DB
+
+* for leaf the data structure is { top left, bottom right, place_ids[] } ?
+
+```
+
+type Node Struct{
+  topLeft*Node
+  bottonRight*Node 
+  4 Points {childrens nodes}
+}
+
+64 byte { topLeft*Node(32 byte)
+  bottonRight*Node (32 byte)}
+  because precison is double double --that is 16 byte
+
+1 Poniter --> 4 bytes
+4 Poniter--> 16 byt
+
+ total byte:=80 byte
+
+
+ space require::
+ 6.5 millions*80 byte+100 millions*32 bytes
+ ~ 4000 millions byte = 4GB
+ This fit in single machine in RAM
+ 
+
+```
+
+Uber is using same Quad tree but little bit complicated because location is moving
+
+How Uber is work??
+
+Intercity this is diffrent product we are not building this -> this is for different city and same city
+
+Intracity same city
+
+```
+Requirement::
+
+1. User take the Cab
+2. Cabs 
+
+Cabs have two state 
+  1. Available to hire
+  2. Unavailable(somebody taken the cab,I am driver and I am goen mark unavailable)
+
+  Usecase:
+    User at(Lat,Lun)
+    match me with nearest avaiable cab
+
+    (Notification goes in round robin 
+    to these cabs here is rider 
+    do you want to accept )->Yes/No
+
+    10 Millions of Cabs 
+
+    best sharding Key is City
+
+    In city wise best case cabs 
+     50000 Cabs
+
+```
