@@ -366,3 +366,340 @@ Cabs have two state
      50000 Cabs
 
 ```
+
+I am at location (X,Y) of city I want nearest cabs
+
+#### Worst Case Solution 
+* Brodcast all the cabs and filter in cabs level if you have to show or not
+* Brodcasting the cabs is very very expensive because every single time lots of person requesting the cabs 
+* you are braodcasting messages to 50k  diffrent cab ids may be avaible that point of time .it is very expensive
+
+####  Dynamically changing Location Solution
+* cab ping the location is avaible every time  using websocket
+```
+Recent Loction  car_id-->(X,Y)
+```
+```
+Lets have 
+In-memory  Map
+Redis
+Key     Value
+cab--> most recent known location
+
+cab is sendin g location every 1 minutes if they are active and moving 
+```
+
+#### From Driver Side app optimization
+
+```
+send location 
+1. only when my location has changed in last 1 minutes
+2. If the driver app knew . the grid part of instead of rely on Quad Tree
+2. If driver know the gridId and also know the gridId boundary and if it is moving within the boundary it's not need to update Quad Tree , only problem is moving beyond the boundary
+
+3. Beyound the gridId then my location is changed then send to in memory Map this is my new gridId
+   Operations happends after that 
+    1. Delete old one point in gridId when changing location
+    2. Add new one point in gridId when changing location
+```
+
+![Alt text](image-16.png)
+
+Do we need to create child node immidately or wait some time??
+
+```
+
+Suppose every grid contain 50 cabs it is thresold
+
+
+Range 50-75 cabs
+if I am ok if cabs is reaches 51  because cabs are moving but if cabs 75 then we have break further in 4 parts
+```
+
+![Alt text](image-17.png)
+
+![Alt text](image-18.png)
+```
+Periodically ,I update grid dimenssion if needed
+
+Probably It have  per hous, per 2nd hour,per 3rd hour
+
+grid split in 4 children
+4 children merge into a grid
+
+1 Hash Map
+cabId--> last known location
+if location is change but gridId is not change then update only HashMap
+
+2. Quad Tree 
+carId-->gridId ,neighbourGridId
+
+if gridId is change the update in QuadTree and also update in HashMap
+```
+
+
+
+# Design Hotstar
+
+This is injestion pipeline
+
+Step1: One person is uploading content on Hotstar there is multiple view consuming by user
+
+![Alt text](image-19.png)
+
+I AM GOING TO DISCUSSING THE INJESTION PIPLINE
+
+### Requirements
+
+```
+1. Admin user must be able to upload the content
+2. End user filter the content by genre,language
+
+multiple step invole in jensetion pipeline eg whenever I upload the vedios there is auto generated thumbnail,I am only uploading to higher resolution quality qualities so I want to from stem generate lower resolution quality
+
+3. Generate lower resolution vedios and thumbnail
+4. Apply geo restriction
+```
+
+
+
+Therse is user uploading vedios to central server to a DB
+
+![Alt text](image-20.png)
+
+### Scale
+
+```
+1. Numbers of vedios available on Hotstar is 1 million
+2. Avg size of the each raw vedio file arround to be 1GB
+```
+
+### Storage 
+
+```
+ storage =1Million*1GB
+         = 10^6*1GB
+ storage =1 Peta Byte=1PB
+
+ what is 1PB storage data ?? 
+ This is binary data (raw data )
+ is it querable formate ??
+ it is never be query on this data
+
+ So this data is no querable data  that is store in something like file system in S3 also strore in CDN
+
+ store in --> S3 or CDN
+
+ what is amount of storage require??
+ in Database 1 million of metadata require to store 
+ 
+ Suppose  1 entry of meta data taking 1 KB stoarge then
+
+ Total storage in DB = 1 Million*1KB=1GB
+
+ 1GB data easly come in one Machine it don't want to require multiple machine it iseasly fit one machine easily
+
+ Lets evaluate the RDBMS system for storage in DB
+```
+
+### Schema
+
+Entities
+
+```
+
+1. User -->uploading vedios
+2. Vedios--> metadata,resulations,language 
+3. Genre(Comedy,Horror,Thriller)
+4. Language-> Hindi,Hnglish,spanish,German
+5. Country
+
+What kind of realtion between these above enties
+
+User has one to many vedios (1:n)
+
+Vedio has many to many Genre (n:m)
+
+there is another table require 
+Vedio_Genere
+id --> not require because the locality of reference
+vedio_id
+genere_id
+
+-->id is not require because locality of reference
+
+-->What is primary key that decide the physical ordering in hard disk
+
+-->fetching the vedios it is faster if be do not include the id fetching through vedio_id beacuse it is decide the storage in hard-disk beacause of it is primary key
+
+Vedio has many to many Language (m:n)
+
+vedio_language
+vedio_id
+lang_id
+
+Vedio has many to many Country (n:m)
+
+vedio_county
+vedio_id
+country_id
+
+```
+
+![Alt text](image-21.png)
+
+### Design Goals
+
+Before you answer wether we would want AP system,CP System,AC System, Look at the what the number we got  amount of data we want to store in RDBMS it is 1GB
+
+--> 1GB Easily fit in one machine
+
+Data can fit in one machine  lets evaluate 
+```
+CAP 
+
+C-consistency
+A-Availability
+P-Partitioning
+```
+
+#### CA System
+
+Data can fit in one machine  so we do not neet of partitioning
+
+What is implication of CA??
+
+Data would be thier in one Node
+* What is problem entire data lieing in one node  
+* If we are replicating the data into another node that mean we are including the paritioning
+* Parition does not mean that is only the sharded data
+* Partition mean that data is residing more than one machine and it has to synchronize between two server call parition
+* That mean we can can replicate becase this partition
+
+```
+CAP does not work for single server 
+if more than one server tha apply  CAP Theorm
+```
+
+My concern in CA system it has one server if it's die then it Single Point Of Failure. 
+```
+If this database is down then Hotstar user unable to see the content
+```
+Availability does not take in accont server crashes
+
+```
+Whole crux of CAP Theorm , 
+Whole CAP Theorm does not take into account
+if your system is down for eg turn off your cluster
+
+I do not Availability
+I do not have Consistency
+I do not have  whole things
+basically I do not have anythings
+
+CAP Theorm based on the assumption 
+Entire system can not be malfunction
+```
+Avoid single point of failure we need replication
+
+What kind of replication ours use case would have??
+is it work with eventual consistency or need of strong consistency
+
+* Eventual consistency will work reason that we do not need stron consistency becuase Rate of TPS entry is made very low since quite low .there is very less change to corrupted to any kind of deplay
+
+So here we have paritioning CA system does not work 
+
+Thre is need AP Model because it is evventual consitency
+
+Here AP system model will work
+
+![Alt text](image-22.png)
+
+### Actual Design
+Most Bruteforce 
+
+There is client calls to upload API ,upload API transfer the file metadata to server  we send everything the data to Database and file send to S3
+
+![Alt text](image-23.png)
+
+TPS is quit low because not every day admin uload the vedios
+
+What is pros of this approch??
+* it is simple 
+
+Demerit :
+* We will inroduce the very very bulk code base.
+* Parallel excution is not there.
+
+##### Client upload the vedio
+when client uplaod the vedios there is multiple step
+
+
+```
+step 1: Check the error (corner copy right voilation)(it's take seconds)
+
+step 2: Whether that vedios uplaod to perticular geography location (it's take minutes)
+
+step 3: Generating lower resolution (this compute intensive task it will take hours)
+
+step 4: manually process and manually approve by somebody (it's take minutes)
+
+step 5: it's take seconds
+
+
+```
+Each step take varying amount of time 
+
+* This is very lengthy process there is multiple steps involve  
+ * There might be manual step as well
+
+ ![Alt text](image-24.png)
+
+ If it is taking hours to complete  it can not keep file into memory ,every task is done then send  particular status to client
+
+ needless to say this can be Sync API it has to be Async API 
+
+ if this is going to be Async API ,can I make use of this Async status  an does make sence ton add status field what is status of particular file 
+
+ ##### Aysnc
+
+ ```
+ step 1: Uplaod to S3
+ step 2: Update database with S3 URL
+ ```
+
+ One more problem  step 1: is fail,then we have uplaod the vedio again
+
+ there would be network wastege then offload the uplaod diretly to client in S3
+
+
+ insead of sending request to client send directly request to S3 , we are saving the bandwidth to Server that is client 
+
+ ![Alt text](image-25.png)
+
+ How will do this ??
+
+1. Creating an API 
+```
+1. API : singedURL
+```
+
+######  SingedURL
+client call to server the server generate what is called tokenizedUrl  This tokenizeUrl have access and time expiry attached to its
+
+It have token we can give any who want to call particular API given time frame ,it have TTL
+When uplad to S3 and tell to server I have loaded into S3
+
+```
+tokenizedUrl: {
+              token 
+              ttl
+              }
+```
+
+```
+2. API :: Start processing call (Async)
+```
+
+If second API is Async then we can introduced the some Queue here
+
