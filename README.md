@@ -561,6 +561,9 @@ CAP
 C-consistency
 A-Availability
 P-Partitioning
+
+Chat based system use CP
+Hoststar using AP system
 ```
 
 #### CA System
@@ -702,4 +705,133 @@ tokenizedUrl: {
 ```
 
 If second API is Async then we can introduced the some Queue here
+
+client has successful uploaded file in S3 but Database does not have infomation that file is uploaded into S3
+
+Therse is two ways make this works:
+```
+1. Client one's file uplaoded into S3 then call Server  then server update particular record and start doing s1 to s5 steps 
+```
+
+there is possiblities  we bombared more requests that my server 
+
+I have bombarded requests very quickly i have to reject all those request above with my thresold and then there will no traffic and end up with again come to API than can handle 
+
+![Alt text](image-26.png)
+
+Above the thresold my system unable to process becasue Unable to handle it 
+
+For this I have add Queue in bentween server and Database
+
+Whenever client uploaded the file into S3 there is one job added into queue and all details of the jobs push into database.Database row contain the status  and Status is contain the state  are  we processing step1 or step3 or last step
+
+![Alt text](image-27.png)
+
+What are the good things about this design ??
+* solve for network
+* If this start to process  it might take to day 1 to 3 because this manuly process .So we need to queue to maintain what step process I am processing and enqueue again so that whenever I have time  worker server available that process which step is rejected
+![Alt text](image-28.png)
+
+![Alt text](image-29.png)
+
+1. First approch is working sequential in queue (Assemby line)
+2. We can achieve using parallelism using DAG directed acyclic graph .That is Natural ordering depencies (topological sorting) and preserve the state and start executing
+
+How the execution look like ::
+
+
+Whenever s1 and s2 start to processing and store into queue when both will complete the process and it status s1 and s2
+![Alt text](image-31.png)
+
+How will achive this??
+
+Any time I am maintaing::
+```
+Ingress:: How many async task originated from server queue
+
+Outgress:: How many coversing to that task in next queue
+
+This problem solve by Semaphore
+
+Semaphore ::
+How many arrows goes out and how many arrow goes in
+then count goes to zero  that mean i will inseted to Database
+```
+
+![Alt text](image-30.png)
+
+### config System 
+
+Pre URL store in database
+
+that can be done throw config system 
+
+```
+preUrl/row-files
+
+preUrl/1080p
+
+preUrl/720p
+
+preUrl/320p
+
+```
+
+#### Retry Mechanism
+
+```
+table
+
+time_updated      status 
+t=0                s1
+
+thresold time for s1 step is 10 minutes 
+
+Every 60 minutes Schedule will start and chek that thresold time exceed than Restart particular job
+
+In this case s1 will restart
+
+```
+
+### Chunking
+
+if we want get 1GB data file from S3 there would be very slow and it will buffering 
+
+Lots of time to send file
+
+![Alt text](image-32.png)
+
+This kind of system no one happy even one user will not happy with this 
+
+The way to do this is create small small chunk of the file and send back small small chunk back
+
+Luckly S3 support chunk download
+
+if I make 100 chunks and 5 threads to downlaod to these chunks. Then order will preverse of chunk 
+
+Maintain order of the file using 
+
+##### Manifest file
+Whenever we send the chunk we craete the hash of it  and oder of hash maintaining into Manifest file 
+
+manifest file 
+```
+ boolean flag it will show is it download or not
+
+              flag
+hash1 chunk1   true
+hash2 chunk2   false
+hash3 chunk3   true
+
+using this information manifest file send to Player and player taking care of fetching the next chunk that how  serve to particualr user 
+
+For live streaming manifest file keep updating  new row into manifest file and player keep fetching new row 
+```
+
+
+Make the vedio globally and create multiple copy for faster access  what happend after uplaoded to S3 after that push to CDN using this it is distributed to everyone 
+
+
+
+
 
