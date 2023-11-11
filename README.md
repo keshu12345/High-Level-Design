@@ -828,8 +828,12 @@ using this information manifest file send to Player and player taking care of fe
 For live streaming manifest file keep updating  new row into manifest file and player keep fetching new row 
 ```
 
+![Alt text](image-33.png)
 
 Make the vedio globally and create multiple copy for faster access  what happend after uplaoded to S3 after that push to CDN using this it is distributed to everyone 
+
+
+If you have low TPS you will get all CAP
 
 
 
