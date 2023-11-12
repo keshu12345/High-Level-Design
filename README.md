@@ -838,4 +838,196 @@ If you have low TPS you will get all CAP
 
 
 
+# IRCTC System Design
 
+## Requirements
+
+* Search train : source and destination
+* Sort Train based on time and price(But this is UI part frontend)
+* Availability per calss (sleeper/AC-1-2-3)
+* Payments(3rd party service)
+* Waitlist-->Persitence in Queue but this chioce you want to take waitlist or not
+* Book tickets
+* Cancel tickets
+* PNR ststus/Booking History
+
+How will implement multiple stops??
+
+GOA MUMBAI  KOTA  DELHI
+* yours ticket book from Mumbai to Kota this is assumption
+* My design right now direct GOA to DELHI design I want to increase complexity of the system ,We are taking only from to  not in between I am taking
+
+this merge interval type problem
+
+## Scale 
+```
+1. There are 4000-5000 trains PAN India that are booked every day
+2. How much storage would be there
+3. What would be the QPS
+4. How many boggies in train
+  20 boggies in each train 
+5. How many rows in boggies
+  20 rows in boggies
+6. How many seats in per row
+  8 seats/row
+
+7. Assume all trains fully booked
+
+totals number of seats to book 
+ =5000 tains*20 boggies*20 rows*8 seats
+ =16 Millions
+ totals seats =16 Millions
+
+ Waitlist is 20%
+  Then Total requests comes per days=16M+16M*20/100=19.2 Millions
+
+  Total requests per day=20 millions approx
+
+  8. This data  booking keep in for 120 days
+
+   -- Beacuse only booking windows open prior of departure of particular trains
+   -- After train will start jounery is booking data require ?? only for auditing perpose required but this archieval data 
+   -- data is older than 120 days pushes into S3
+
+  Data storage require ::
+
+  20Millions*120 days
+  2400 Millions
+```
+
+status  whether is it book or not
+#### Amount of data store require:
+```
+Booking Table
+
+ticket_id(id)
+user_id  32 byte
+seat_id  32 byte
+train_id 32 byte
+src      32 byte
+dest     32 byte
+date of journey 4 byte
+amount   4 byte
+status   4 byte
+PNR      4 byte
+
+total byte for record=175 bytes 
+
+ ~ 200 byte
+
+ total storage =2400M*200=480 GB
+
+ can data store in 1 machine ??
+ we can stiorage in 480 GB
+
+ this is hint we can store the data in 1 machine right now we are not taking decision to take database
+
+
+```
+
+#### Calculate the QPS(Query Per Second)
+
+```
+Successful Write QPS
+
+for all seats we aree doing write 
+--> 20 millions per day
+
+calcuate per second :: QPS
+
+Max QPS at the time of Tatkal Booking
+1. 30% of booking done in a day are Tatkal booking
+2. All 30% booking done within 10 minutes
+3. What is Max QPS??
+Max QPS=(30% of 20 Millions)/10*60+(70% of 20 millions)/12*3600
+= 10K request/second
+
+```
+
+```
+if I need to 10k trasaction in 1 sec and just have one thread 
+
+10K txn-->1sec
+
+What can be maximum latency of 1 write??
+
+10000 txn=1sec
+1 txn=1/10000=0.1ms (so 0.1 ms is not enough)
+ Then how will increase the throughput
+
+ So we need to multi-threading
+```
+
+```
+if it has singe-core-processsor
+what is number of write at given instance like t=0 is 1 write
+
+single-core-processor
+time   write
+t=0     1 instruction
+
+Run 10000 instruction or write parallely also complete in 0.1ms
+
+This is fine latecny 
+
+any application latency between  1ms to 700ms is fine
+
+
+suppose 10 ms take to write and store in database time taken by 10000 thread 
+
+10ms latency=10000
+1ms=10000/10=1000
+
+There are require 1000 threads to complete the tasks 
+
+one thead write one instruction in 10 ms
+then 
+in one second will write the 100 tx
+
+1ms =1 txn/ms=100txn/sec
+1 ms= 100txn/sec
+
+So there is 100 thread require to complete in 1ms all the instruction 
+
+```
+
+![Alt text](image-34.png)
+
+is there any limit to execute number of threads in CPU??
+
+```
+# of instructions your CPU can handle in 1 sec=2.2*10^9 per sec
+
+= 1 Billion  instructions handle by CPU in one Sec
+
+One of the responsibility of operating system  give eqal opportunity of all thread
+
+So there is context switch 
+
+```
+
+How many threads can actually write at very very  same time  this is parallelism
+![Alt text](image-35.png)
+
+```
+
+CPU take some to when has to switch between threads
+there are  CPU cycle there are nano seconds waste from thread 1 to thread 2 when increase the number of threads in ours system instead of inreasing the performance ,degrading the performance
+```
+
+```
+Idle numbers of thread=2*n+1
+n is number of cores
+
+if n=1
+idle # of threads=3
+
+if n=2
+
+idle # of threads=5
+
+These all are user threads and application threads not os threads
+```
+
+
+## Non-Function Requirements
