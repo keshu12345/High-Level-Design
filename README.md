@@ -1219,7 +1219,7 @@ you have to do the payment within the 5 minutes otherwise yours ticket goes away
 
 ![Alt text](image-47.png)
 
-After 5 minutes I will run the crone job to figure out what are the entities payment is false and 5 minutes is elpse I have to neet free this resources 
+After 5 minutes I will run the crone job to figure out what are the entities payment is false and 5 minutes is elpse I have to need free this resources 
 at t=300 seconds I run another job
 ![Alt text](image-46.png)
 
