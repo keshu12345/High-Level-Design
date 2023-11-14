@@ -1197,7 +1197,7 @@ There is two cases for timestamp
 1.  Where we are not holding the inventory and making the purchage and only updating the record
 
 ![Alt text](image-44.png)
-2.  
+2.   Lock the inventory for particular time
   
 
 We have invetory for column user_id and timestamp
