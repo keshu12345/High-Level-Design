@@ -1223,3 +1223,211 @@ After 5 minutes I will run the crone job to figure out what are the entities pay
 at t=300 seconds I run another job
 ![Alt text](image-46.png)
 
+
+## Design NewsFeed
+
+Feeds of everythings my friends is doing 
+
+NewsFeeed is resent activity 
+
+How would have server ?? or 
+How would have been generate??
+
+WHole data is store in single machine how will design Scheme
+
+Newsfeed is order in a ways that is most intresting to me
+
+Prediction to me mean feedranking algorithm
+### Schema Design 
+
+
+```
+Table
+
+user has a many Posts
+
+User
+--Id 
+--Name
+
+Post
+--id 
+--userId
+--content
+--imgae_url 
+--time_stamp
+
+Firends
+--userId1
+keshav
+keshav
+keshav
+
+--userId2
+A
+B
+C
+
+Likes
+--user_id
+--post_id
+
+Comments
+--id
+--user_id
+--post_id
+--content
+--time_stamp
+
+getAllKeshavFriends()
+getAllPostsOfKeshavFriendsInDescOrder()
+
+```
+
+![Alt text](image-48.png)
+
+
+
+### Scale
+
+```
+
+1. How many daily active users??
+   300 Millions
+2. 10% peoples make post in a day
+   30 Millions posts/day
+3. How many maximums characters in a post 
+   500 characters (in twitter 180 characters limit)
+
+   total space require to store 
+   =30 miilions *500 bytes
+   = 15GB 
+
+   Facebook run for 10 years then how many data is generated 
+   =15GB*365*10
+   =54,750 GB
+   =55 TB
+
+```
+
+
+### Sharding
+
+1. Shard base on the user_id
+
+all these infomation will goes into one shard
+```
+user_profile infomation
+posts make by keshav
+friends of Keshav
+Likes make bye Keshav
+Comments made bye Keshav
+
+
+These above infomation will go in one shard
+
+This block will not further split into one machine and one in other machine 
+
+All the complete block will go in machine
+```
+
+![Alt text](image-49.png)
+
+```
+fetchingTimeLine
+fetchProfileInfomation ::this is also very easy
+
+
+fetchingTimeLine: post done by keshav 
+post is done by Keshav
+
+I will go to Keshav cluster and Get all the posts done by keshav is very very fast
+```
+
+```
+sharding key user_id 
+
+Here is newsFeed is very tricky
+1. getFrindsOfKeshav:: this is very issue go into keshav shard and get the keshav frinds
+2. find posts made by frinds :: but those frinds donot gurantee it will be in same machine could be in different machine
+
+If keshav have 1000 friends and it may be 1000 machines  and fetching from 1000 machines post is very very time taking
+
+```
+
+1. It is slow process
+2. It is error to prone proccess 
+
+because one newsFeed call 100-1000's query it will be very slow
+
+Trying build high level based on user_id sharding
+
+1. Get all frinds of keshav  is very fast
+
+2. Get Keshav friends post is very slow We should make fast
+
+
+![Alt text](image-50.png)
+
+
+Post is store of hypthetical 30 days old not more that this
+
+```
+
+15GB*30=250GB
+This can not fit in RAM
+
+It can fit in Hard Disk in one machine
+
+For only the resent post,only the post made recently whitch are relevent to my newsFeed they can store in one machine
+```
+
+This database use as cache it is unconvetional but we can use
+
+```
+Recent_Pots table
+
+post_id
+user_Id(indexing)
+timestamp (indexing)
+content 
+
+step 1: get all friends of keshav
+step2 : canculate the newsfeeds
+
+```
+
+```
+SELECT*
+FROM Recent_Pots
+WHERE user_id IN(f1,f2---f100)
+LIMIT 40
+```
+Derived cache
+
+![Alt text](image-51.png)
+
+There is 100 of machines  we have take the data all of the machines
+
+![Alt text](image-52.png)
+
+Every night or every hour run a script and looks for entry more 30 days old that run based on the timestamp index
+
+```
+select * from recent_pots
+where t1<t2
+```
+this in multiple machine of replicas
+
+![Alt text](image-53.png)
+
+post create and postgioes to mani DB base on the use and also async write in Recent_Posts Db
+
+![Alt text](image-54.png)
+
+
+For 60 days data will not work so we have to timsstamp based sharding
+
+
+
+
