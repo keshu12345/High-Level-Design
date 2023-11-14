@@ -1030,4 +1030,196 @@ These all are user threads and application threads not os threads
 ```
 
 
-## Non-Function Requirements
+## Non-Function Requirements or Design Goals
+
+```
+1. Consistency
+2. Latency: few seconds
+3. Highly concurrent system
+```
+
+## API
+
+```
+search(src,dest,Date)
+return list of trains (it have availabilty of seats)
+```
+```
+Book(train_id,noOfTicket,class,user_id,src,dest,date)
+```
+```
+cancel(ticket_id,user_id)
+```
+```
+getStatus(ticket_id,user_id)
+```
+
+## Services
+
+1. Search Service (M1) just static infomation
+2. Availability Service (M2)
+3. Book Service (M3) (After chooseing the train paymnet generate and sed to Generate Service)
+4. Payment Service (M4)
+5. Complete Booking Service (M3)
+
+Search is independt what is happend in M2 and M3
+
+![Alt text](image-36.png)
+
+Serach is staic data not growing and update frequent
+
+Start with monolith just two sense here:
+
+1. Command and Query Responsibility Segregation (CQRS)
+ * typically tapically go with CQRS
+ * it is seperate Read and Write
+
+ If some one search trains if it is not find out it is come out  so there is require Search Service
+
+![Alt text](image-37.png)
+
+```
+Static data: trains,Users(Most Search request coming)
+Dynamic Data : Booking/Availability
+
+both have diffrent scalebility requrement
+So there is require tow database
+--redis
+--RDBMS
+
+```
+![Alt text](image-38.png)
+
+is M2 and M3 should be single service ??
+1.  Before doing the book first check the availability
+
+
+### Sharding
+
+1. train_id : we have train_id as sharding one of the problem let's suppose I want to fetch my booking that is already done 
+  * Train 1(DELHI-MUMBAI)
+  * Train 2(GOA-MUMBAI)
+Fetching my booking query call to multiple shard
+  * fetching my booked ticket is slow
+
+  ![Alt text](image-39.png)
+  Whenever is dual writes ,we have distingues the source of truth  so source of truth dynamic data that is booking service and also write into User that is static data
+  * keeping train_id and duplicate the purchasing history that is solve my problem
+2. seat_id--> Not possible
+3. user_id--> not possible
+4. city_id
+5. destination
+6. Date --> this working as shard key and also IRCTC also using DATE as shard key 
+
+
+there is 1 hour maintainace window , at which 11:30-12:30 website is down 
+```
+tables it will  1 millions read all from booking tables 
+and update the User profiles from booking that is user done these are booking from that date or day
+
+1. It will not work if problem of QPS
+  -- reason maximum QPS come in a particular day so all the query will hitting the particular shard
+2. It will work if problem of storage
+
+```
+
+if i have design the system I will choose the tarin_id is sharding key
+
+### Replication 
+Just avoid the single point of failure then relpicate the data
+
+##### Leader and Follower Model
+
+Quoram Approach 
+
+```
+Read+Write>RF
+RF-Replication Factore
+
+It is give strong consistency
+R+W>RF
+```
+
+
+![Alt text](image-40.png)
+
+### Concurrency
+
+Concurrency issue:
+* There are 100 inventory avaialbe for the 100 inventory 100K people want to book  this ticket 
+
+How can do this without impacting user experiance ??
+* Whoever to come first and book pariticular ticket
+* To book particular ticket to book a particular ticket ,I know the  high TPS  is only for 10 minutes
+* What easly do it ,I can offload actual seat allocation to a later time  for that way I do not search particular ticket  particulat fee allocation 
+
+  1.  Hi this is your seat number and this your PNR number and this urs fee ticket ,We are goen sent to you email id 
+  2. All you do neet to you maintain a counter and decrement the counter as soon as you get request and associate ID and aprticular User
+
+
+#### Brute force solution for Concurrency
+  ##### Rate limiting  Brutforce
+  Get 1000 request persist in DB then run batch Job on their current timestamp as soon as  this number 
+  reaches 100 request I will start rejected future requests
+  
+  After the tatkal spike is gone we run the Batch offline Batch analysis to allocate the seat to every passenger who is trying to book 
+
+  1. I want to associate the particular seat_number with it  what is easiest data-structure to do this ??
+
+  ![Alt text](image-41.png)
+
+  ```
+  My rows goes something like this 
+
+  initaly left side all data  is filled 
+
+  Whichever user come first I will associate the user on it
+
+  We take the perspected lock to my seat  I do not have the lock on particular row because only I am adding user  U1,U2.U3 when payment is done 
+
+first WHo have completed the payment who entered in table mean allocated seat ,Rest will be waitlisted and trigger a refund process fee  ,people who not able to get threw  there might we cases  there are lots is data is empty that is fine 
+
+Lets look the corner case I just have last seat avaible 
+my application servers the AS1,AS2,AS3,These are trying to book a ticket for U1,U2,U3 all of them trying to acquire the lock on the last resource ,First one Who is avaible to acquire the lock and complete the trasaction and trasaction return error to other two ,only one able to book a ticket  does that make sence
+
+Problem is that maintain the lock for some time  like BookMyShow  allow to hold ticket  for 15 minutes after it's  expire  .The way to do that again using DB clock itself  and attached the timestamp for how many timestamp it is done ,Every 10 and 15 minutes  you refresh and run a cron job ,If this is still in trasaction mean this transaction not complete remove this trasaction  for refund it 
+                                     user_id
+
+  Train1     Boggies1     Seat1
+  ```
+
+
+![Alt text](image-42.png)
+
+
+There is two cases for timestamp 
+
+1.  Where we are not holding the inventory and making the purchage and only updating the record
+
+![Alt text](image-44.png)
+2.  
+  
+
+We have invetory for column user_id and timestamp
+
+![Alt text](image-43.png)
+
+Lets suppose I do not want to block  particular seat for any user 
+Then This timestamp is required for purpose of locking (sudo locking )This timestamp immatrial  when we are not holding lock for sometime  
+
+```
+Most of e-commerse website there is flash sale for Apples iphone Those are based on the same prinples those hold the inventory for 1 minute or 2 minutes for complete the payment ,If you don't make the payment within that time then this inventory release for everyone
+```
+![Alt text](image-45.png)
+
+If I want to hold the inventory before doing the payment there is another column require  time_created and another column is_Paid 
+
+I am blocking the inventory lets suppose for 5 minutes
+you have to do the payment within the 5 minutes otherwise yours ticket goes away
+
+![Alt text](image-47.png)
+
+After 5 minutes I will run the crone job to figure out what are the entities payment is false and 5 minutes is elpse I have to neet free this resources 
+at t=300 seconds I run another job
+![Alt text](image-46.png)
+
