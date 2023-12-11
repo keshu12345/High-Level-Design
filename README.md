@@ -1710,3 +1710,100 @@ IN HEART-BEAT-RECIEVE-TIME
 
 
 
+
+
+
+
+
+## Design Google docs
+Optimistic Locking
+
+Sync Strategy :
+1.  Event Passing (Operational Transformation)
+   Character by Character or line by line
+2. Differential Sync
+    eg git diff 
+
+### Operational Transformation 
+
+
+Each modification is event and transfer server to client back and forth every time 
+instantly
+
+Operational transformation ,at its core ,is an optimistic concurrency control 
+mechanism .It's allow two editors to modify same section of document  at the same 
+time without conflict.or rather it provides mechanism for sanely resolving those 
+conflict so that nighter user intervention nor locking become necessary.
+
+Operations
+1.  Insert()
+2.  Update()
+3.  Delete()
+4.  Retain()
+5.  ChangeTheFont()
+6.  ChangeFontColor()
+
+```
+xform(a,b)=(a`,b`) where b`o a=b O a`
+a-client operation 
+b-server operation
+a`-server operation
+b`-client operation 
+
+```
+![img.png](img.png)
+
+![img_1.png](img_1.png)
+
+####  Differential Sync
+
+![img_3.png](img_3.png)
+
+C-Client
+
+CC-Client Copy
+
+S-Server
+
+SC-Server Copy
+
+ 
+![img_4.png](img_4.png)
+![img_5.png](img_5.png)
+
+
+
+## Design Netflix
+
+Adoptive Bitrate Streaming
+
+
+
+
+
+## Stock Exchange
+
+![img_6.png](img_6.png)
+
+![img_7.png](img_7.png)
+
+![img_8.png](img_8.png)
+
+![img_9.png](img_9.png)
+
+## Stock Broker System Design 
+
+![img_10.png](img_10.png)
+![img_11.png](img_11.png)
+![img_12.png](img_12.png)
+![img_13.png](img_13.png)
+![img_14.png](img_14.png)
+![img_15.png](img_15.png)
+
+![img_16.png](img_16.png)
+![img_17.png](img_17.png)
+
+
+
+
+
